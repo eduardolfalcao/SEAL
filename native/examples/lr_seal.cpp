@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 
-#include "../SEAL/native/examples/examples.h"
+#include "examples.h"
 #include "seal/seal.h"
 #include <iostream>
 
@@ -91,7 +91,7 @@ void decryptAndPrint(Decryptor* decryptor,CKKSEncoder* encoder,Ciphertext enc, s
 	vector<double> output;
 	encoder->decode(plain_res, output);
 	cout << "    + Result vector ...... Correct." << endl;
-	print_vector(output, 4, 10);
+	print_vector(output);
 
 }
 
@@ -396,10 +396,18 @@ Ciphertext g(Ciphertext x, Evaluator* evaluator, CKKSEncoder* encoder, Decryptor
 
 Ciphertext h(vector<Ciphertext> x, Ciphertext theta, Evaluator* evaluator, CKKSEncoder* encoder, Decryptor* decryptor, RelinKeys relin_keys, double scale, std::shared_ptr<SEALContext>* context){
 
-	cout << "relin_keys: " << relin_keys.size() << endl;
+	for(Ciphertext xRow : x){
+		decryptAndPrint(decryptor,encoder,xRow,"xRow");
+	
+		Ciphertext theta_temp = theta;
 
-	Ciphertext x1 = x;
-	Ciphertext x2;
+		evaluator->multiply_inplace(theta_temp,xRow);
+		evaluator->relinearize_inplace(theta_temp, relin_keys);
+		evaluator->rescale_to_next_inplace(theta_temp);
+
+		Ciphertext sum;
+
+	}
 
 }
 
@@ -430,7 +438,8 @@ int main(){
 
 	double scale = pow(2.0, 40);
 
-	print_line(__LINE__);
+	//sigmoid
+	/*print_line(__LINE__);
 	vector<double> input{ -0.5 };
 	cout << "Input vector: " << endl;
 	print_vector(input);
@@ -447,12 +456,55 @@ int main(){
 
 	Ciphertext enc_sq = g(encrypted, &evaluator, &encoder,&decryptor, relin_keys, scale, &context);
 
+	Plaintext plain_res;
+	print_line(__LINE__);
+	cout << "Decrypt and decode." << endl;
+	decryptor.decrypt(enc_sq, plain_res);
+	vector<double> output;
+	encoder.decode(plain_res, output);
+	cout << "    + Result vector ...... Correct." << endl;
+	print_vector(output, 4, 10);*/
 
-	//evaluator).rescale_to_next_inplace(x1);	
 
-	/*evaluator.multiply_inplace(x3,x1);
-	evaluator.relinearize_inplace(x3, relin_keys);
-	evaluator.rescale_to_next_inplace(x3);*/
+
+	//hypothesis
+	print_line(__LINE__);
+	vector<vector<double>> inputMatrix{ 
+				{0.5, 0.5, 0.5},
+				{0.5, 0.5, 0.5},
+				{0.5, 0.5, 0.5}	};
+	vector<Plaintext> plain_x;
+	for(vector<double> inputVector : inputMatrix){
+		Plaintext plain_v;
+		encoder.encode(inputVector, scale, plain_v);
+		plain_x.push_back(plain_v);
+	}
+	vector<Ciphertext> encrypted_x_vec;
+	for(Plaintext plain : plain_x){
+		Ciphertext encrypted_x;
+		encryptor.encrypt(plain, encrypted_x);
+		encrypted_x_vec.push_back(encrypted_x);		
+	}
+	
+	vector<double> inputVector{ 0.5, 0.5, 0.5 };
+	Plaintext plain_theta;
+	encoder.encode(inputVector, scale, plain_theta);
+	Ciphertext encrypted_theta;
+	encryptor.encrypt(plain_theta, encrypted_theta);
+
+	Ciphertext hx = h(encrypted_x_vec, encrypted_theta, &evaluator, &encoder, &decryptor, relin_keys, scale, &context);
+
+
+	/*print_line(__LINE__);
+	cout << "Encode input vector." << endl;
+	encoder.encode(input, scale, plain);
+
+	Ciphertext encrypted;
+	print_line(__LINE__);
+	cout << "Encrypt input vector and square." << endl;
+	encryptor.encrypt(plain, encrypted);
+
+	Ciphertext enc_sq = g(encrypted, &evaluator, &encoder,&decryptor, relin_keys, scale, &context);
 
 	Plaintext plain_res;
 	print_line(__LINE__);
@@ -461,37 +513,9 @@ int main(){
 	vector<double> output;
 	encoder.decode(plain_res, output);
 	cout << "    + Result vector ...... Correct." << endl;
-	print_vector(output, 4, 10);
-
-	/*vector<double> output;
-	cout << "    + Decode input vector ...... Correct." << endl;
-	encoder.decode(plain, output);
-	print_vector(output);
-
-	Ciphertext encrypted;
-	print_line(__LINE__);
-	cout << "Encrypt input vector, square, and relinearize." << endl;
-	encryptor.encrypt(plain, encrypted);
-
-	evaluator.square_inplace(encrypted);
-	evaluator.relinearize_inplace(encrypted, relin_keys);
-
-	Plaintext plain_float;
-	encoder.encode(3.5, scale, plain_float);
-	evaluator.multiply_plain_inplace(encrypted,plain_float);	
-	evaluator.relinearize_inplace(encrypted, relin_keys);
-
-	cout << "    + Scale in squared input: " << encrypted.scale()
-		        << " (" << log2(encrypted.scale()) << " bits)" << endl;
-
-	print_line(__LINE__);
-	cout << "Decrypt and decode." << endl;
-	decryptor.decrypt(encrypted, plain);
-	encoder.decode(plain, output);
-	cout << "    + Result vector ...... Correct." << endl;
-	print_vector(output);*/
-
-
+	print_vector(output, 4, 10);*/
+	
+		
 	/*
 	// Creating an object of CSVWriter
 	CSVReader reader("mimic10lines.csv");
@@ -530,148 +554,8 @@ int main(){
 
 
 
-    	/*
-	    We create a small vector to encode; the CKKSEncoder will implicitly pad it
-	    with zeros to full size (poly_modulus_degree / 2) when encoding.
-	    */
-	/*vector<double> input{ 0.0, 1.1, 2.2, 3.3 };
-    	cout << "Input vector: " << endl;
-    	print_vector(input);*/
-
-    	/*
-	    Now we encode it with CKKSEncoder. The floating-point coefficients of `input'
-	    will be scaled up by the parameter `scale'. This is necessary since even in
-	    the CKKS scheme the plaintext elements are fundamentally polynomials with
-	    integer coefficients. It is instructive to think of the scale as determining
-	    the bit-precision of the encoding; naturally it will affect the precision of
-	    the result.
-
-	    In CKKS the message is stored modulo coeff_modulus (in BFV it is stored modulo
-	    plain_modulus), so the scaled message must not get too close to the total size
-	    of coeff_modulus. In this case our coeff_modulus is quite large (218 bits) so
-	    we have little to worry about in this regard. For this simple example a 30-bit
-	    scale is more than enough.
-	    */
-
-    	/*
-	 *     We can instantly decode to check the correctness of encoding.
-	 *      */
-	/*vector<double> output;
-    	cout << "    + Decode input vector ...... Correct." << endl;
-    	encoder.decode(plain, output);
-    	print_vector(output);*/
-
-
-	/*
-	print_line(__LINE__);
-	int x = 6;
-	Plaintext x_plain(to_string(x));
-	cout << "Express x = " + to_string(x) + " as a plaintext polynomial 0x" + x_plain.to_string() + "." << endl;
-
-	print_line(__LINE__);
-	Ciphertext x_encrypted;
-	cout << "Encrypt x_plain to x_encrypted." << endl;
-	encryptor.encrypt(x_plain, x_encrypted);
-
-	cout << "    + size of freshly encrypted x: " << x_encrypted.size() << endl;
-	cout << "    + noise budget in freshly encrypted x: " << decryptor.invariant_noise_budget(x_encrypted) << " bits" << endl;
-
-	Plaintext x_decrypted;
-	cout << "    + decryption of x_encrypted: ";
-	decryptor.decrypt(x_encrypted, x_decrypted);
-	cout << "0x" << x_decrypted.to_string() << " ...... Correct." << endl;*/
-
 	return 0;
 
-/**
-	print_example_banner("Example: BFV Basics");
-
-	EncryptionParameters parms(scheme_type::BFV);
-
-	size_t poly_modulus_degree = 4096;
-	parms.set_poly_modulus_degree(poly_modulus_degree);
-
-	parms.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
-
-	parms.set_plain_modulus(256);
-
-
-	auto context = SEALContext::Create(parms);
-
-	print_line(__LINE__);
-	cout << "Set encryption parameters and print" << endl;
-	print_parameters(context);
-
-	cout << endl;
-	cout << "~~~~~~ A naive way to calculate 2(x^2+1)(x+1)^2. ~~~~~~" << endl;
-
-
-	KeyGenerator keygen(context);
-	PublicKey public_key = keygen.public_key();
-	SecretKey secret_key = keygen.secret_key();
-
-	Encryptor encryptor(context, public_key);
-	Evaluator evaluator(context);
-	Decryptor decryptor(context, secret_key);
-
-	print_line(__LINE__);
-	int x = 6;
-	Plaintext x_plain(to_string(x));
-	cout << "Express x = " + to_string(x) + " as a plaintext polynomial 0x" + x_plain.to_string() + "." << endl;
-
-	print_line(__LINE__);
-	Ciphertext x_encrypted;
-	cout << "Encrypt x_plain to x_encrypted." << endl;
-	encryptor.encrypt(x_plain, x_encrypted);
-
-	cout << "    + size of freshly encrypted x: " << x_encrypted.size() << endl;
-	cout << "    + noise budget in freshly encrypted x: " << decryptor.invariant_noise_budget(x_encrypted) << " bits" << endl;
-
-	Plaintext x_decrypted;
-	cout << "    + decryption of x_encrypted: ";
-	decryptor.decrypt(x_encrypted, x_decrypted);
-	cout << "0x" << x_decrypted.to_string() << " ...... Correct." << endl;
-
-	print_line(__LINE__);
-	cout << "Compute x_sq_plus_one (x^2+1)." << endl;
-	Ciphertext x_sq_plus_one;
-	evaluator.square(x_encrypted, x_sq_plus_one);
-	Plaintext plain_one("1");
-	evaluator.add_plain_inplace(x_sq_plus_one, plain_one);
-
-	cout << "    + size of x_sq_plus_one: " << x_sq_plus_one.size() << endl;
-	cout << "    + noise budget in x_sq_plus_one: " << decryptor.invariant_noise_budget(x_sq_plus_one) << " bits" << endl;
-
-	Plaintext decrypted_result;
-
-	cout << "    + decryption of x_sq_plus_one: ";
-	decryptor.decrypt(x_sq_plus_one, decrypted_result);
-	cout << "0x" << decrypted_result.to_string() << " ...... Correct." << endl;
-
-	print_line(__LINE__);
-	cout << "Compute x_plus_one_sq ((x+1)^2)." << endl;
-	Ciphertext x_plus_one_sq;
-	evaluator.add_plain(x_encrypted, plain_one, x_plus_one_sq);
-	evaluator.square_inplace(x_plus_one_sq);
-	cout << "    + size of x_plus_one_sq: " << x_plus_one_sq.size() << endl;
-	cout << "    + noise budget in x_plus_one_sq: " << decryptor.invariant_noise_budget(x_plus_one_sq) << " bits" << endl;
-	cout << "    + decryption of x_plus_one_sq: ";
-	decryptor.decrypt(x_plus_one_sq, decrypted_result);
-	cout << "0x" << decrypted_result.to_string() << " ...... Correct." << endl;
-
-	print_line(__LINE__);
-	cout << "Compute encrypted_result (2(x^2+1)(x+1)^2)." << endl;
-	Ciphertext encrypted_result;
-	Plaintext plain_two("2");
-	evaluator.multiply_plain_inplace(x_sq_plus_one, plain_two);
-	evaluator.multiply(x_sq_plus_one, x_plus_one_sq, encrypted_result);
-	cout << "    + size of encrypted_result: " << encrypted_result.size() << endl;
-	cout << "    + noise budget in encrypted_result: " << decryptor.invariant_noise_budget(encrypted_result) << " bits" << endl;
-	cout << "NOTE: Decryption can be incorrect if noise budget is zero." << endl;
-
-	cout << endl;
-	cout << "~~~~~~ A better way to calculate 2(x^2+1)(x+1)^2. ~~~~~~" << endl;
-*/
 
 }
 
